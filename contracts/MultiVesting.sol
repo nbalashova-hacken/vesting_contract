@@ -43,12 +43,6 @@ contract MultiVesting {
         ));
 
     }
-    function currrentTimestamp() external view returns (uint) {
-        return block.timestamp;
-    }
-    function getAddressBalance(address adr) external view returns (uint) {
-        return adr.balance;
-    }
    
     function _calculateTotalVestedAmount(
         uint256 vestingStartTime, 
@@ -69,18 +63,30 @@ contract MultiVesting {
         }
     }
 
-    function withdraw(uint id) public { 
-        Vesting storage vesting = vestings[msg.sender][id];
-      
-        uint vestedAmount =_calculateTotalVestedAmount(
+    function _calculateWithdrawableAmount(Vesting storage vesting) internal view returns(uint){
+        uint vestedAmount = _calculateTotalVestedAmount(
             vesting.vestingStartTime, 
             vesting.cliffDuration, 
             vesting.vestingDuration, 
             vesting.amount
         );
+        return vestedAmount - vesting.claimedAmount;
 
-        uint withdrawableAmount = vestedAmount - vesting.claimedAmount;
-        vesting.claimedAmount = vestedAmount;
+    }
+
+    function withdrawable(uint id) public view returns (uint)  {
+        Vesting storage vesting =  vestings[msg.sender][id];
+        
+        return _calculateWithdrawableAmount(vesting);
+
+    }
+    function withdraw(uint id) public { 
+        Vesting storage vesting = vestings[msg.sender][id];
+      
+        uint withdrawableAmount =_calculateWithdrawableAmount(vesting);
+        //uint withdrawableAmount =_calculateTotalVestedAmount(vesting.vestingStartTime, vesting.cliffDuration, vesting.vestingDuration, vesting.amount) - vesting.claimedAmount;
+
+        vesting.claimedAmount += withdrawableAmount;
 
         IERC20(vesting.token).safeTransfer(msg.sender, withdrawableAmount);
         
